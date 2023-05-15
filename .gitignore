@@ -1,0 +1,4 @@
+wasm_modules
+.vscode
+deployment
+config.yaml
