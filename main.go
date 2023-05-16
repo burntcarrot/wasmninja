@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
@@ -25,20 +24,20 @@ var (
 )
 
 func init() {
-	// Create a Redis client
+	// Create a Redis client.
 	redisClient = redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379", // Update with your Redis server address
-		Password: "",               // Set Redis password if applicable
-		DB:       0,                // Redis database index
+		Addr:     "localhost:6379",
+		Password: "",
+		DB:       0,
 	})
 
-	// Initialize the Wasmer runtime
+	// Initialize the wasmer runtime.
 	err := initializeRuntime()
 	if err != nil {
 		log.Fatal("Failed to initialize Wasmer runtime:", err)
 	}
 
-	// Preload all WebAssembly modules
+	// Preload all WebAssembly modules.
 	if err := preloadModules(); err != nil {
 		log.Fatal("Failed to preload WebAssembly modules:", err)
 	}
@@ -50,7 +49,6 @@ func main() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
 
-	// Start the FaaS server
 	server := &http.Server{
 		Addr:         ":8080",
 		Handler:      http.HandlerFunc(handler),
@@ -97,13 +95,12 @@ func handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func parseRequestPath(path string) (string, string) {
-	// Extract module name and query from the path
-	// Adjust the parsing logic based on your specific requirements
+	// TODO: parse request path to get module name and query
 	return "example", "42"
 }
 
 func preloadModules() error {
-	moduleFiles, err := ioutil.ReadDir("wasm_modules")
+	moduleFiles, err := os.ReadDir("wasm_modules")
 	if err != nil {
 		return fmt.Errorf("failed to read module directory: %w", err)
 	}
@@ -112,7 +109,7 @@ func preloadModules() error {
 		if !file.IsDir() && filepath.Ext(file.Name()) == ".wasm" {
 			modulePath := filepath.Join("wasm_modules", file.Name())
 
-			wasmBytes, err := ioutil.ReadFile(modulePath)
+			wasmBytes, err := os.ReadFile(modulePath)
 			if err != nil {
 				return fmt.Errorf("failed to read module %s: %w", modulePath, err)
 			}
@@ -145,7 +142,7 @@ func getModule(moduleName string) (*wasmer.Module, error) {
 	if err != nil {
 		// Module not found in cache, load it from disk
 		modulePath := filepath.Join("wasm_modules", moduleName+".wasm")
-		wasmBytes, err := ioutil.ReadFile(modulePath)
+		wasmBytes, err := os.ReadFile(modulePath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read module %s: %w", modulePath, err)
 		}
@@ -199,7 +196,6 @@ func invokeModule(module *wasmer.Module, query string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to generate import object: %w", err)
 	}
 
-	// importObject := wasmer.NewImportObject()
 	instance, err := wasmer.NewInstance(module, importObject)
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate module: %w", err)

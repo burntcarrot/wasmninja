@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wasmfaas
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wasmfaas
+  template:
+    metadata:
+      labels:
+        app: wasmfaas
+    spec:
+      containers:
+        - name: wasmfaas
+          image: wasmfaas
+          ports:
+            - containerPort: 8080
+          env:
+            - name: MODULE_LOADER
+              value: minio
+            - name: MINIO_ENDPOINT
+              value: minio-service:9000
+            - name: MINIO_ACCESS_KEY
+              value: your-minio-access-key
+            - name: MINIO_SECRET_KEY
+              value: your-minio-secret-key
+            - name: MINIO_BUCKET_NAME
+              value: your-minio-bucket-name
+          volumeMounts:
+            - name: wasm-modules
+              mountPath: /app/wasm_modules
+      volumes:
+        - name: wasm-modules
+          emptyDir: {}
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: wasmfaas-service
+spec:
+  selector:
+    app: wasmfaas
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minio
+  template:
+    metadata:
+      labels:
+        app: minio
+    spec:
+      containers:
+        - name: minio
+          image: minio/minio
+          ports:
+            - containerPort: 9000
+          env:
+            - name: MINIO_ACCESS_KEY
+              value: your-minio-access-key
+            - name: MINIO_SECRET_KEY
+              value: your-minio-secret-key
+          args:
+            - server
+            - /data
+          volumeMounts:
+            - name: minio-data
+              mountPath: /data
+      volumes:
+        - name: minio-data
+          emptyDir: {}
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-service
+spec:
+  selector:
+    app: minio
+  ports:
+    - protocol: TCP
+      port: 9000
+      targetPort: 9000

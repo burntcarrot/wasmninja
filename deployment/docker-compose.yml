@@ -1,0 +1,28 @@
+version: '3'
+services:
+  wasmfaas:
+    build: .
+    ports:
+      - 8080:8080
+    environment:
+      - MODULE_LOADER=${MODULE_LOADER}
+      - MINIO_ENDPOINT=${MINIO_ENDPOINT}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+      - MINIO_BUCKET_NAME=${MINIO_BUCKET_NAME}
+    volumes:
+      - ./wasm_modules:/app/wasm_modules
+
+  minio:
+    image: minio/minio
+    ports:
+      - 9000:9000
+      - 9001:9001
+    environment:
+      # - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_ACCESS_KEY=O/uCyO6FcWvh3OrfeNEURbNYCvadfyPaI1cAKzc0Q+Q=
+      - MINIO_SECRET_KEY=2l53yEim336tN2cqtpD1w93F+/gdlxQoaUIs055wS1E=
+      # - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+    command: server /data --console-address ":9001"
+    volumes:
+      - ./minio-data:/data
