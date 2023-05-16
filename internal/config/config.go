@@ -12,8 +12,14 @@ import (
 )
 
 type Config struct {
+	Server ServerConfig `koanf:"server"`
 	Cache  CacheConfig  `koanf:"cache"`
 	Loader LoaderConfig `koanf:"loader"`
+}
+
+type ServerConfig struct {
+	Host string `validate:"omitempty" koanf:"host" default:"localhost"`
+	Port int    `validate:"omitempty" koanf:"port" default:"8080"`
 }
 
 type CacheConfig struct {
@@ -51,6 +57,15 @@ func NewConfig(configFile string) (*Config, error) {
 	var cfg Config
 	if err := k.Unmarshal("", &cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal configuration: %v", err)
+	}
+
+	// Fallback values
+	if cfg.Server.Host == "" {
+		cfg.Server.Host = "localhost"
+	}
+
+	if cfg.Server.Port == 0 {
+		cfg.Server.Port = 8080
 	}
 
 	if err := validateConfig(cfg); err != nil {

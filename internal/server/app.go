@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -21,7 +22,10 @@ type App struct {
 }
 
 func NewApp() (*App, error) {
-	cfg, err := config.NewConfig("config.yaml")
+	configFile := flag.String("config", "config.yaml", "path to the config file")
+	flag.Parse()
+
+	cfg, err := config.NewConfig(*configFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config: %v", err)
 	}
@@ -42,7 +46,7 @@ func NewApp() (*App, error) {
 		return nil, fmt.Errorf("failed to preload WebAssembly module: %v", err)
 	}
 
-	server := setupServer(moduleLoader, moduleInvoker)
+	server := setupServer(cfg.Server, moduleLoader, moduleInvoker)
 
 	return &App{
 		server: server,
@@ -59,7 +63,6 @@ func (a *App) Start() error {
 		a.shutdownServer()
 	}()
 
-	log.Println("Starting server on port 8080...")
 	if err := a.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return err
 	}
@@ -67,14 +70,17 @@ func (a *App) Start() error {
 	return nil
 }
 
-func setupServer(moduleLoader *module.ModuleLoader, moduleInvoker *module.ModuleInvoker) *http.Server {
+func setupServer(cfg config.ServerConfig, moduleLoader *module.ModuleLoader, moduleInvoker *module.ModuleInvoker) *http.Server {
 	mux := http.NewServeMux()
 
 	handler := NewHandler(moduleLoader, moduleInvoker)
-	mux.HandleFunc("/", handler.Handle)
+	mux.HandleFunc("/invoke", handler.Handle)
+	mux.HandleFunc("/health", handler.Health)
+
+	log.Printf("Starting server on %s....\n", fmt.Sprintf("%s:%d", cfg.Host, cfg.Port))
 
 	return &http.Server{
-		Addr:         ":8080",
+		Addr:         fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
 		Handler:      mux,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
