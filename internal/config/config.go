@@ -59,11 +59,7 @@ func NewConfig(configFile string) (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal configuration: %v", err)
 	}
 
-	// Fallback values
-	if cfg.Server.Host == "" {
-		cfg.Server.Host = "localhost"
-	}
-
+	// Fallback value
 	if cfg.Server.Port == 0 {
 		cfg.Server.Port = 8080
 	}
