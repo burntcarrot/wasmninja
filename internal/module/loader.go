@@ -8,10 +8,10 @@ import (
 	"path/filepath"
 
 	"github.com/burntcarrot/wasmninja/internal/config"
+	"github.com/burntcarrot/wasmninja/internal/objectstore"
 	"github.com/burntcarrot/wasmninja/internal/runtime"
 
 	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
 const (
@@ -34,10 +34,7 @@ func NewModuleLoader(cfg config.LoaderConfig, cache *ModuleCache, runtime *runti
 	}
 
 	if cfg.ModuleLoader == OBJECTSTORE_LOADER {
-		client, err := minio.New(cfg.MinioConfig.Endpoint, &minio.Options{
-			Creds:  credentials.NewStaticV4(cfg.MinioConfig.AccessKey, cfg.MinioConfig.SecretKey, ""),
-			Secure: false,
-		})
+		client, err := objectstore.ConnectMinio(cfg.MinioConfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create Minio client: %w", err)
 		}
