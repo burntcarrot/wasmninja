@@ -4,14 +4,19 @@ services:
     build: .
     ports:
       - 8080:8080
-    environment:
-      - MODULE_LOADER=${MODULE_LOADER}
-      - MINIO_ENDPOINT=${MINIO_ENDPOINT}
-      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
-      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
-      - MINIO_BUCKET_NAME=${MINIO_BUCKET_NAME}
     volumes:
       - ./wasm_modules:/app/wasm_modules
+      - ./config.yaml:/app/config.yaml
+    depends_on:
+      - minio
+      - redis
+    networks:
+      - wasmninja_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://wasmninja:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
 
   minio:
     image: minio/minio
@@ -24,3 +29,25 @@ services:
     command: server /data --console-address ":9001"
     volumes:
       - ./minio-data:/data
+    networks:
+      - wasmninja_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://minio:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  redis:
+    image: redis
+    ports:
+      - 6379:6379
+    networks:
+      - wasmninja_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+networks:
+  wasmninja_network:
