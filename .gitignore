@@ -26,3 +26,4 @@ wasm_modules
 config.yaml
 *minio-data
 .envrc
+dist

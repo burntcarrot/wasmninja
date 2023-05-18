@@ -1,0 +1,17 @@
+project_name: wasmninja
+
+builds:
+  - id: "wasmninja"
+    main: main.go
+    binary: wasmninja
+    goos:
+      - linux
+      - darwin
+      - windows
+      - openbsd
+    goarch:
+      - amd64
+      - arm64
+    mod_timestamp: '{{ .CommitTimestamp }}'
+    env:
+    - CGO_ENABLED=0
