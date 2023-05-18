@@ -55,8 +55,11 @@ func (h *Handler) Handle(ctx *fasthttp.RequestCtx) {
 	}
 
 	ctx.SetContentType("application/json")
-	ctx.Write(responseJSON)
-
+	_, err = ctx.Write(responseJSON)
+	if err != nil {
+		ctx.Error(fmt.Sprintf("Failed to write response: %v", err), fasthttp.StatusInternalServerError)
+		return
+	}
 }
 
 func (h *Handler) Health(ctx *fasthttp.RequestCtx) {
