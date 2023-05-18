@@ -2,10 +2,9 @@ package server
 
 import (
 	"fmt"
-	"io"
-	"net/http"
 
 	"github.com/burntcarrot/wasmninja/internal/module"
+	"github.com/valyala/fasthttp"
 
 	jsoniter "github.com/json-iterator/go"
 )
@@ -26,35 +25,22 @@ func NewHandler(moduleLoader *module.ModuleLoader, moduleInvoker *module.ModuleI
 	}
 }
 
-func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to read request body: %v", err), http.StatusBadRequest)
-		return
-	}
-	err = r.Body.Close()
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to close request body: %v", err), http.StatusBadRequest)
-		return
-	}
-
-	var reqBody InvokeRequest
-
-	err = json.Unmarshal(body, &reqBody)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to parse request body: %v", err), http.StatusBadRequest)
+func (h *Handler) Handle(ctx *fasthttp.RequestCtx) {
+	reqBody := InvokeRequest{}
+	if err := json.Unmarshal(ctx.Request.Body(), &reqBody); err != nil {
+		ctx.Error(fmt.Sprintf("Failed to parse request body: %v", err), fasthttp.StatusBadRequest)
 		return
 	}
 
 	module, err := h.moduleLoader.LoadModule(reqBody.Module)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to load module: %v", err), http.StatusInternalServerError)
+		ctx.Error(fmt.Sprintf("Failed to load module: %v", err), fasthttp.StatusInternalServerError)
 		return
 	}
 
 	output, err := h.moduleInvoker.InvokeModuleWaZero(module.Bytes, reqBody.Data)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to invoke module: %v", err), http.StatusInternalServerError)
+		ctx.Error(fmt.Sprintf("Failed to invoke module: %v", err), fasthttp.StatusInternalServerError)
 		return
 	}
 
@@ -64,16 +50,16 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 
 	responseJSON, err := json.Marshal(response)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to marshal response: %v", err), http.StatusInternalServerError)
+		ctx.Error(fmt.Sprintf("Failed to marshal response: %v", err), fasthttp.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJSON)
+	ctx.SetContentType("application/json")
+	ctx.Write(responseJSON)
 
 }
 
-func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("OK"))
+func (h *Handler) Health(ctx *fasthttp.RequestCtx) {
+	ctx.SetStatusCode(fasthttp.StatusOK)
+	ctx.SetBody([]byte("OK"))
 }

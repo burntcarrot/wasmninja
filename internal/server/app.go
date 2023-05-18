@@ -15,10 +15,12 @@ import (
 	"github.com/burntcarrot/wasmninja/internal/config"
 	"github.com/burntcarrot/wasmninja/internal/module"
 	"github.com/burntcarrot/wasmninja/internal/runtime"
+	"github.com/valyala/fasthttp"
 )
 
 type App struct {
-	server *http.Server
+	server *fasthttp.Server
+	cfg    *config.Config
 }
 
 func NewApp() (*App, error) {
@@ -30,7 +32,11 @@ func NewApp() (*App, error) {
 		return nil, fmt.Errorf("failed to load config: %v", err)
 	}
 
-	cache := cache.NewConnection(cfg.Cache)
+	cache, err := cache.NewConnection(cfg.Cache)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to cache: %v", err)
+	}
+
 	runtime := runtime.NewRuntime(context.Background())
 
 	moduleCache := module.NewModuleCache(cache.Connection)
@@ -50,6 +56,7 @@ func NewApp() (*App, error) {
 
 	return &App{
 		server: server,
+		cfg:    cfg,
 	}, nil
 }
 
@@ -63,34 +70,46 @@ func (a *App) Start() error {
 		a.shutdownServer()
 	}()
 
-	if err := a.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+	addr := fmt.Sprintf("%s:%d", a.cfg.Server.Host, a.cfg.Server.Port)
+	if err := a.server.ListenAndServe(addr); err != nil && err != http.ErrServerClosed {
 		return err
 	}
 
 	return nil
 }
 
-func setupServer(cfg config.ServerConfig, moduleLoader *module.ModuleLoader, moduleInvoker *module.ModuleInvoker) *http.Server {
-	mux := http.NewServeMux()
-
+func setupServer(cfg config.ServerConfig, moduleLoader *module.ModuleLoader, moduleInvoker *module.ModuleInvoker) *fasthttp.Server {
 	handler := NewHandler(moduleLoader, moduleInvoker)
-	mux.HandleFunc("/invoke", handler.Handle)
-	mux.HandleFunc("/health", handler.Health)
+	mux := requestHandler(handler)
 
 	log.Printf("Starting server on %s....\n", fmt.Sprintf("%s:%d", cfg.Host, cfg.Port))
 
-	return &http.Server{
-		Addr:         fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
-		Handler:      mux,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 10 * time.Second,
+	return &fasthttp.Server{
+		Handler:            mux,
+		MaxConnsPerIP:      10000,
+		ReadTimeout:        30 * time.Second,
+		WriteTimeout:       30 * time.Second,
+		IdleTimeout:        60 * time.Second,
+		MaxRequestBodySize: 10 * 1024 * 1024, // 10MB
+		DisableKeepalive:   true,
+	}
+}
+
+func requestHandler(h *Handler) fasthttp.RequestHandler {
+	return func(ctx *fasthttp.RequestCtx) {
+		switch string(ctx.Path()) {
+		case "/invoke":
+			h.Handle(ctx)
+		case "/health":
+			h.Health(ctx)
+		default:
+			ctx.Error("Not Found", fasthttp.StatusNotFound)
+		}
 	}
 }
 
 func (a *App) shutdownServer() {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := a.server.Shutdown(ctx); err != nil {
+	if err := a.server.Shutdown(); err != nil {
 		log.Println("Server shutdown error:", err)
 		return
 	}
